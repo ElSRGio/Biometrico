@@ -1,42 +1,142 @@
 package com.example.biometricos
 
+import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.fragment.app.FragmentActivity
-import com.example.biometricos.activitys.HomeActivity
-import com.example.biometricos.activitys.LoginActivity
-import com.example.biometricos.ui.theme.BiometricosTheme
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import com.example.biometricos.databinding.ActivityMainBinding
+import com.github.mikephil.charting.charts.BarChart
+import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
+import java.util.concurrent.Executor
 
-class MainActivity : FragmentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            BiometricosTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    var estaAutenticado by remember { mutableStateOf(false) }
+class MainActivity : AppCompatActivity() {
 
-                    if (estaAutenticado){
-                        HomeActivity()
-                    }else{
-                        LoginActivity(
-                            onAutenticacionExitosa = { estaAutenticado = true }
-                        )
-                    }
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var executor: Executor
+    private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var promptInfo: BiometricPrompt.PromptInfo
 
-                }
+    private val speechResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val matches = result.data!!.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = matches?.get(0) ?: ""
+
+            val metricas = extraerMetricas(spokenText)
+            if (metricas != null) {
+                Toast.makeText(this, "Distancia: ${metricas.first}km, Tiempo: ${metricas.second}min", Toast.LENGTH_LONG).show()
+                // Aquí se enviaría al backend en una implementación real
+            } else {
+                Toast.makeText(this, "No se reconocieron las métricas. Intenta de nuevo.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        setupBiometrics()
+
+        binding.btnRecord.setOnClickListener {
+            iniciarGrabacion()
+        }
+
+        // Datos de ejemplo para la gráfica
+        val datosEjemplo = listOf(
+            Pair("Lun", 5.0f),
+            Pair("Mar", 8.2f),
+            Pair("Mie", 4.5f),
+            Pair("Jue", 10.0f),
+            Pair("Vie", 6.7f)
+        )
+        configurarGrafica(binding.barChart, datosEjemplo)
+
+        // Iniciar autenticación al abrir
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    private fun setupBiometrics() {
+        executor = ContextCompat.getMainExecutor(this)
+        biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(applicationContext, "Error: $errString", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    Toast.makeText(applicationContext, "Acceso concedido", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(applicationContext, "Huella no reconocida", Toast.LENGTH_SHORT).show()
+                }
+            })
+
+        promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Acceso Deportivo")
+            .setSubtitle("Confirma tu identidad para acceder a tus métricas")
+            .setNegativeButtonText("Cancelar")
+            .build()
+    }
+
+    private fun iniciarGrabacion() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+        }
+        speechResultLauncher.launch(intent)
+    }
+
+    private fun extraerMetricas(texto: String): Pair<Double, Int>? {
+        val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros)", RegexOption.IGNORE_CASE)
+        val regexTiempo = Regex("([0-9]+)\\s*(min|minutos)", RegexOption.IGNORE_CASE)
+
+        val matchDistancia = regexDistancia.find(texto)
+        val matchTiempo = regexTiempo.find(texto)
+
+        if (matchDistancia != null && matchTiempo != null) {
+            val distancia = matchDistancia.groupValues[1].replace(",", ".").toDoubleOrNull()
+            val tiempo = matchTiempo.groupValues[1].toIntOrNull()
+
+            if (distancia != null && tiempo != null) {
+                return Pair(distancia, tiempo)
+            }
+        }
+        return null
+    }
+
+    private fun configurarGrafica(barChart: BarChart, datos: List<Pair<String, Float>>) {
+        val entries = ArrayList<BarEntry>()
+
+        datos.forEachIndexed { index, dato ->
+            entries.add(BarEntry(index.toFloat(), dato.second))
+        }
+
+        val dataSet = BarDataSet(entries, "Kilómetros Recorridos")
+        dataSet.color = ContextCompat.getColor(this, android.R.color.holo_teal_dark)
+        dataSet.valueTextColor = ContextCompat.getColor(this, android.R.color.white)
+        dataSet.valueTextSize = 12f
+
+        val data = BarData(dataSet)
+        barChart.data = data
+
+        barChart.description.isEnabled = false
+        barChart.setFitBars(true)
+        barChart.animateY(1000)
+        barChart.axisLeft.textColor = ContextCompat.getColor(this, android.R.color.white)
+        barChart.axisRight.isEnabled = false
+        barChart.xAxis.textColor = ContextCompat.getColor(this, android.R.color.white)
+        barChart.legend.textColor = ContextCompat.getColor(this, android.R.color.white)
+        barChart.invalidate()
     }
 }
