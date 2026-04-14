@@ -6,6 +6,8 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.example.biometricos.databinding.ActivityMainBinding
@@ -30,7 +32,7 @@ class MainActivity : AppCompatActivity() {
             val metricas = extraerMetricas(spokenText)
             if (metricas != null) {
                 Toast.makeText(this, "Distancia: ${metricas.first}km, Tiempo: ${metricas.second}min", Toast.LENGTH_LONG).show()
-                // Aquí se enviaría al backend en una implementación real
+                // Aquí se enviaría al backend en una implementación real usando el API_KEY
             } else {
                 Toast.makeText(this, "No se reconocieron las métricas. Intenta de nuevo.", Toast.LENGTH_SHORT).show()
             }
@@ -82,10 +84,11 @@ class MainActivity : AppCompatActivity() {
                 }
             })
 
+        // Requerimiento 3: Fallback con PIN/Patrón si la biometría falla o no es posible (sudor, etc.)
         promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Acceso Deportivo")
-            .setSubtitle("Confirma tu identidad para acceder a tus métricas")
-            .setNegativeButtonText("Cancelar")
+            .setSubtitle("Usa tu huella o PIN para acceder a tus métricas")
+            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
             .build()
     }
 
@@ -97,7 +100,16 @@ class MainActivity : AppCompatActivity() {
         speechResultLauncher.launch(intent)
     }
 
-    private fun extraerMetricas(texto: String): Pair<Double, Int>? {
+    private fun extraerMetricas(textoOriginal: String): Pair<Double, Int>? {
+        // Requerimiento 4: Normalización de texto para mitigar fallos de reconocimiento de voz
+        var texto = textoOriginal.lowercase()
+            .replace("un", "1").replace("uno", "1")
+            .replace("dos", "2").replace("tres", "3")
+            .replace("cuatro", "4").replace("cinco", "5")
+            .replace("seis", "6").replace("siete", "7")
+            .replace("ocho", "8").replace("nueve", "9")
+            .replace("diez", "10").replace("media hora", "30 minutos")
+
         val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros)", RegexOption.IGNORE_CASE)
         val regexTiempo = Regex("([0-9]+)\\s*(min|minutos)", RegexOption.IGNORE_CASE)
 

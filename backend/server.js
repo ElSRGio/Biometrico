@@ -10,10 +10,19 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Atlas conectado'))
     .catch(err => console.error('Error de conexión:', err));
 
+// Middleware de autenticación por API Key
+const verificarApiKey = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+        return res.status(401).json({ error: 'Acceso denegado. API Key inválida.' });
+    }
+    next();
+};
+
 const Entrenamiento = require('./models/Entrenamiento');
 
-// Endpoint para guardar métricas (RF04)
-app.post('/api/entrenamientos', async (req, res) => {
+// Endpoint para guardar métricas (RF04) con protección de API Key
+app.post('/api/entrenamientos', verificarApiKey, async (req, res) => {
     try {
         const { distanciaKm, tiempoMinutos, textoOriginal } = req.body;
         const nuevoEntrenamiento = new Entrenamiento({
@@ -25,11 +34,11 @@ app.post('/api/entrenamientos', async (req, res) => {
         await nuevoEntrenamiento.save();
         res.status(201).json(nuevoEntrenamiento);
     } catch (error) {
-        res.status(500).json({ error: 'Error al guardar el entrenamiento' });
+        res.status(400).json({ error: error.message || 'Error al guardar el entrenamiento' });
     }
 });
 
-app.get('/api/entrenamientos', async (req, res) => {
+app.get('/api/entrenamientos', verificarApiKey, async (req, res) => {
     try {
          const entrenamientos = await Entrenamiento.find().sort({ fecha: 1 });
          res.status(200).json(entrenamientos);
