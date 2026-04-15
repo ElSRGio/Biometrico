@@ -41,7 +41,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.material)
+    implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
     
     // Seguridad Biométrica
@@ -49,6 +49,11 @@ dependencies {
     
     // Gráficas
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // Networking & Coroutines
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

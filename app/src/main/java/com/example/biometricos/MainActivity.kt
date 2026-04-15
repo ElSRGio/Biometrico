@@ -3,6 +3,7 @@ package com.example.biometricos
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -10,11 +11,19 @@ import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.biometricos.databinding.ActivityMainBinding
+import com.example.biometricos.network.ApiService
+import com.example.biometricos.network.EntrenamientoRequest
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.Executor
 
 class MainActivity : AppCompatActivity() {
@@ -23,6 +32,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var executor: Executor
     private lateinit var biometricPrompt: BiometricPrompt
     private lateinit var promptInfo: BiometricPrompt.PromptInfo
+    
+    // Configuración de Retrofit (En producción, esto iría en un Singleton o DI)
+    private val apiService: ApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl("http://10.0.2.2:3000/") // IP por defecto para el host desde el emulador Android
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+    }
 
     private val speechResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK && result.data != null) {
@@ -31,8 +49,7 @@ class MainActivity : AppCompatActivity() {
 
             val metricas = extraerMetricas(spokenText)
             if (metricas != null) {
-                Toast.makeText(this, "Distancia: ${metricas.first}km, Tiempo: ${metricas.second}min", Toast.LENGTH_LONG).show()
-                // Aquí se enviaría al backend en una implementación real usando el API_KEY
+                enviarMetricasAlBackend(metricas.first, metricas.second, spokenText)
             } else {
                 Toast.makeText(this, "No se reconocieron las métricas. Intenta de nuevo.", Toast.LENGTH_SHORT).show()
             }
@@ -50,7 +67,6 @@ class MainActivity : AppCompatActivity() {
             iniciarGrabacion()
         }
 
-        // Datos de ejemplo para la gráfica
         val datosEjemplo = listOf(
             Pair("Lun", 5.0f),
             Pair("Mar", 8.2f),
@@ -60,8 +76,31 @@ class MainActivity : AppCompatActivity() {
         )
         configurarGrafica(binding.barChart, datosEjemplo)
 
-        // Iniciar autenticación al abrir
         biometricPrompt.authenticate(promptInfo)
+    }
+
+    private fun enviarMetricasAlBackend(distancia: Double, tiempo: Int, texto: String) {
+        // RF04: Persistencia real en la nube usando Coroutines
+        lifecycleScope.launch {
+            try {
+                val request = EntrenamientoRequest(distancia, tiempo, texto)
+                // RNF01: Uso de API Key (Hardcoded para el examen, en producción usar BuildConfig o Keystore)
+                val response = withContext(Dispatchers.IO) {
+                    apiService.guardarEntrenamiento("secreto_deportivo_123", request)
+                }
+
+                if (response.isSuccessful) {
+                    Toast.makeText(this@MainActivity, "Entrenamiento guardado en la nube", Toast.LENGTH_LONG).show()
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("NetworkError", "Error al guardar: $errorBody")
+                    Toast.makeText(this@MainActivity, "Error del servidor: ${response.code()}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("NetworkError", "Fallo de conexión", e)
+                Toast.makeText(this@MainActivity, "Fallo de red: Verifica tu conexión", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupBiometrics() {
@@ -84,7 +123,6 @@ class MainActivity : AppCompatActivity() {
                 }
             })
 
-        // Requerimiento 3: Fallback con PIN/Patrón si la biometría falla o no es posible (sudor, etc.)
         promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Acceso Deportivo")
             .setSubtitle("Usa tu huella o PIN para acceder a tus métricas")
@@ -101,7 +139,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extraerMetricas(textoOriginal: String): Pair<Double, Int>? {
-        // Requerimiento 4: Normalización de texto para mitigar fallos de reconocimiento de voz
         var texto = textoOriginal.lowercase()
             .replace("un", "1").replace("uno", "1")
             .replace("dos", "2").replace("tres", "3")

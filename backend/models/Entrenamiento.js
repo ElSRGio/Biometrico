@@ -9,7 +9,7 @@ const entrenamientoSchema = new mongoose.Schema({
     tiempoMinutos: {
         type: Number,
         required: true,
-        min: [0, 'El tiempo no puede ser negativa']
+        min: [0, 'El tiempo no puede ser negativo']
     },
     textoOriginal: { type: String },
     fecha: { type: Date, default: Date.now }
