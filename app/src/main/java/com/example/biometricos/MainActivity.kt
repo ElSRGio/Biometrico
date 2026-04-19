@@ -172,7 +172,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dataSet = BarDataSet(entries, "Kilómetros Recorridos")
-        dataSet.color = ContextCompat.getColor(this, android.R.color.holo_teal_dark)
+        dataSet.color = ContextCompat.getColor(this, R.color.teal_700)
         dataSet.valueTextColor = ContextCompat.getColor(this, android.R.color.white)
         dataSet.valueTextSize = 12f
 
