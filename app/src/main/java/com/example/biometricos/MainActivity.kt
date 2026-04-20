@@ -12,7 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.biometricos.adapters.NotasAdapter
 import com.example.biometricos.databinding.ActivityMainBinding
-import com.example.biometricos.network.Entrenamiento
+import com.example.biometricos.dominios.Entrenamiento
 import com.example.biometricos.network.RetrofitClient
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.data.BarData
@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var notasAdapter: NotasAdapter
+    private val API_KEY = "secreto_deportivo_123"
 
     private val speechResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK && result.data != null) {
@@ -85,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) { 
-                    RetrofitClient.instance.getEntrenamientos() 
+                    RetrofitClient.instance.obtenerEntrenamientos(API_KEY) 
                 }
                 if (response.isSuccessful && response.body() != null) {
                     val lista = response.body()!!
@@ -105,14 +106,14 @@ class MainActivity : AppCompatActivity() {
             try {
                 // Actualizado para coincidir con el nuevo modelo de Entrenamiento
                 val request = Entrenamiento(
-                    distanceKm = distancia, 
-                    timeMinutes = tiempo, 
+                    distanciaKm = distancia, 
+                    tiempoMinutos = tiempo, 
                     originalText = texto,
                     type = "RUNNING",
                     tags = listOf("Manos Libres", "Voz")
                 )
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.instance.guardarEntrenamiento(request)
+                    RetrofitClient.instance.guardarEntrenamiento(API_KEY, request)
                 }
 
                 if (response.isSuccessful) {
@@ -134,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) { 
-                    RetrofitClient.instance.borrarEntrenamiento(id) 
+                    RetrofitClient.instance.eliminarEntrenamiento(API_KEY, id) 
                 }
                 if (response.isSuccessful) {
                     cargarEntrenamientos()
@@ -148,7 +149,7 @@ class MainActivity : AppCompatActivity() {
     private fun actualizarGrafica(lista: List<Entrenamiento>) {
         val entries = ArrayList<BarEntry>()
         lista.takeLast(7).forEachIndexed { index, ent ->
-            entries.add(BarEntry(index.toFloat(), ent.distanceKm.toFloat()))
+            entries.add(BarEntry(index.toFloat(), ent.distanciaKm.toFloat()))
         }
         configurarGrafica(binding.barChart, entries)
     }

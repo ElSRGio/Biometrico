@@ -1,31 +1,30 @@
 package com.example.biometricos.dominios
 
-data class EntradaBitacora(
-    val fecha: String,
-    val hora: String,
-    val titulo: String,
-    val resumen: String
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class UserProfile(
+    val id: String,
+    val name: String,
+    val weightKg: Double,
+    val heightCm: Int,
+    val avatarUrl: String
 )
 
+@Serializable
+data class AiFeedback(
+    val emoji: String,
+    val shortMessage: String
+)
 
-/* este codigo es provicional para su examen la datos debe ser extraidos desde la base de datos*/
-val listaEntradaEjemplo = listOf(
-    EntradaBitacora(
-        fecha = "2024-06-01",
-        hora = "08:30",
-        titulo = "Reunión con el equipo de desarrollo",
-        resumen = "Discutimos los avances del proyecto y asignamos nuevas tareas."
-    ),
-    EntradaBitacora(
-        fecha = "2024-06-02",
-        hora = "14:00",
-        titulo = "Presentación del proyecto al cliente",
-        resumen = "Mostramos el progreso del proyecto y recibimos feedback positivo."
-    ),
-    EntradaBitacora(
-        fecha = "2024-06-03",
-        hora = "10:15",
-        titulo = "Revisión de código",
-        resumen = "Realizamos una revisión de código para mejorar la calidad del software."
-    )
+@Serializable
+data class Entrenamiento(
+    val id: String? = null,
+    val type: String = "RUNNING",
+    val distanciaKm: Double,
+    val tiempoMinutos: Int,
+    val tags: List<String> = emptyList(),
+    val originalText: String,
+    val aiFeedback: AiFeedback? = null,
+    val fecha: String? = null
 )
