@@ -1,51 +1,54 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-
 const app = express();
 app.use(express.json());
 
-// RNF01: Seguridad, conexión mediante variable de entorno
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Atlas conectado'))
-    .catch(err => console.error('Error de conexión:', err));
+    .catch(err => console.error(err));
 
-// Middleware de autenticación por API Key
 const verificarApiKey = (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_KEY) {
-        return res.status(401).json({ error: 'Acceso denegado. API Key inválida.' });
-    }
+    if (!apiKey || apiKey !== process.env.API_KEY) return res.status(401).json({ error: 'Inválido' });
     next();
 };
 
 const Entrenamiento = require('./models/Entrenamiento');
+const Usuario = require('./models/Usuario');
 
-// Endpoint para guardar métricas (RF04) con protección de API Key
+// RF06: Obtener Perfil para Dashboard e IMC
+app.get('/api/users/profile', verificarApiKey, async (req, res) => {
+    let perfil = await Usuario.findOne();
+    if (!perfil) perfil = await Usuario.create({});
+    res.json(perfil);
+});
+
+// RF04: Guardar con Feedback Dinámico
 app.post('/api/entrenamientos', verificarApiKey, async (req, res) => {
     try {
         const { distanciaKm, tiempoMinutos, textoOriginal } = req.body;
-        const nuevoEntrenamiento = new Entrenamiento({
+        const tags = distanciaKm > 8 ? ["Récord", "Cardio"] : ["Cardio"];
+
+        const nuevo = new Entrenamiento({
             distanciaKm,
             tiempoMinutos,
             textoOriginal,
-            fecha: new Date()
+            tags,
+            aiFeedback: {
+                emoji: distanciaKm > 5 ? "⚡" : "🔋",
+                shortMessage: distanciaKm > 5 ? "¡Velocidad pro!" : "Buen esfuerzo."
+            }
         });
-        await nuevoEntrenamiento.save();
-        res.status(201).json(nuevoEntrenamiento);
-    } catch (error) {
-        res.status(400).json({ error: error.message || 'Error al guardar el entrenamiento' });
-    }
+        await nuevo.save();
+        res.status(201).json(nuevo);
+    } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 app.get('/api/entrenamientos', verificarApiKey, async (req, res) => {
-    try {
-         const entrenamientos = await Entrenamiento.find().sort({ fecha: 1 });
-         res.status(200).json(entrenamientos);
-    } catch (error) {
-         res.status(500).json({ error: 'Error al obtener datos' });
-    }
+    const data = await Entrenamiento.find().sort({ fecha: -1 });
+    res.json(data);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
