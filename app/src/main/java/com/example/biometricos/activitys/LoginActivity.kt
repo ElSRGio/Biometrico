@@ -1,133 +1,67 @@
 package com.example.biometricos.activitys
 
-import android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG
-import android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import android.content.Intent
+import android.os.Bundle
 import android.widget.Toast
-import androidx.biometric.BiometricManager
+import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
-import com.example.biometricos.components.ActionButton
-import com.example.biometricos.components.AppTitle
-import com.example.biometricos.components.FinggerprintIcon
+import com.example.biometricos.MainActivity
+import com.example.biometricos.databinding.ActivityLoginBinding
+import java.util.concurrent.Executor
 
-@Composable
-fun LoginActivity(onAutenticacionExitosa: ()-> Unit) {
+class LoginActivity : AppCompatActivity() {
 
-    val context = LocalContext.current
-    val activity =  context as? FragmentActivity
+    private lateinit var binding: ActivityLoginBinding
+    private lateinit var executor: Executor
+    private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var promptInfo: BiometricPrompt.PromptInfo
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
-    ){
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            FinggerprintIcon(modifier = Modifier.padding(bottom = 24.dp))
-            AppTitle(text = "Bitacora")
-            Spacer(modifier = Modifier.height(48.dp))
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-            FinggerprintIcon(size = 120.dp, alpha = 0.6f)
+        configurarBiometria()
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            ActionButton(
-                onClick = {
-                    if (activity != null) {
-                        LanzarBiometrica(activity, onAutenticacionExitosa)
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "Error: No se pudo iniciar la autenticación biométrica",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                },
-                text = "Iniciar sesión",
-                icon = Icons.Default.Fingerprint
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TextButton(onClick = {}) {
-                Text(
-                    text = "Usar pin de dispositivo",
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
+        // Si el usuario toca el icono de la huella, pide la biometría
+        binding.btnBiometric.setOnClickListener {
+            biometricPrompt.authenticate(promptInfo)
         }
+        
+        // Lanzamos la huella automáticamente al entrar
+        biometricPrompt.authenticate(promptInfo)
     }
 
+    private fun configurarBiometria() {
+        executor = ContextCompat.getMainExecutor(this)
+        biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(applicationContext, "Autenticación cancelada", Toast.LENGTH_SHORT).show()
+                }
 
-}
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    // EXITO: Saltamos al MainActivity (que actúa como Home)
+                    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                    finish() // Cerramos el login para que no pueda volver con el botón "Atrás"
+                }
 
-fun LanzarBiometrica(activity: FragmentActivity, onAutenticacionExitosa: () -> Unit){
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(applicationContext, "Huella no reconocida", Toast.LENGTH_SHORT).show()
+                }
+            })
 
-    val executor = ContextCompat.getMainExecutor(activity)
-
-    val biometricPrompt = BiometricPrompt(activity, executor,
-        object: BiometricPrompt.AuthenticationCallback(){
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                Toast.makeText(activity, "Error: $errString", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                Toast.makeText(activity, "Desbloqueo exitoso", Toast.LENGTH_SHORT).show()
-                onAutenticacionExitosa()
-            }
-
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                Toast.makeText(activity, "Huella no reconocida, intenta de nuevo", Toast.LENGTH_SHORT).show()
-            }
-        })
-
-    val promptInfo= BiometricPrompt.PromptInfo.Builder()
-        .setTitle("Acceso a la bitacora")
-        .setSubtitle("Autenticacion reqeurida")
-        .setDescription("Usa tu huella para acceder a la bitacora")
-        .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
-        .build()
-
-    val biometricManager = BiometricManager.from(activity)
-    if (biometricManager.canAuthenticate(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)== BiometricManager.BIOMETRIC_SUCCESS){
-        biometricPrompt.authenticate(promptInfo)
-    }else{
-        Toast.makeText(activity, "Huella no configurada en el dispositivo", Toast.LENGTH_SHORT).show()
+        promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Acceso Seguro")
+            .setSubtitle("Usa tu huella para entrar a tu perfil")
+            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+            .build()
     }
 }

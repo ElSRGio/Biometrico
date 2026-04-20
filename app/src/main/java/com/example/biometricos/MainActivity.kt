@@ -173,17 +173,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extraerMetricas(textoOriginal: String): Pair<Double, Int>? {
-        val texto = textoOriginal.lowercase()
-        val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros)")
-        val regexTiempo = Regex("([0-9]+)\\s*(min|minutos)")
+        // 1. Limpiamos y normalizamos números hablados
+        var texto = textoOriginal.lowercase().trim()
+            .replace("un", "1").replace("uno", "1").replace("dos", "2")
+            .replace("tres", "3").replace("cuatro", "4").replace("cinco", "5")
+            .replace("seis", "6").replace("siete", "7").replace("ocho", "8")
+            .replace("nueve", "9").replace("diez", "10")
+            .replace("media hora", "30 minutos").replace("una hora", "60 minutos")
 
-        val matchD = regexDistancia.find(texto)
-        val matchT = regexTiempo.find(texto)
+        // 2. Regex súper flexible (acepta "5km", "5 km", "5k", "5.5 kilómetros")
+        val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros|k)", RegexOption.IGNORE_CASE)
+        // Acepta "20min", "20 min", "20 minutos", "20m"
+        val regexTiempo = Regex("([0-9]+)\\s*(min|minutos|m)", RegexOption.IGNORE_CASE)
 
-        return if (matchD != null && matchT != null) {
-            val d = matchD.groupValues[1].replace(",", ".").toDoubleOrNull() ?: 0.0
-            val t = matchT.groupValues[1].toIntOrNull() ?: 0
-            Pair(d, t)
-        } else null
+        val matchDistancia = regexDistancia.find(texto)
+        val matchTiempo = regexTiempo.find(texto)
+
+        // Log para depurar qué está escuchando realmente el teléfono
+        android.util.Log.d("VOZ", "Texto original: $textoOriginal | Normalizado: $texto")
+
+        if (matchDistancia != null && matchTiempo != null) {
+            val distancia = matchDistancia.groupValues[1].replace(",", ".").toDoubleOrNull()
+            val tiempo = matchTiempo.groupValues[1].toIntOrNull()
+
+            if (distancia != null && tiempo != null) {
+                return Pair(distancia, tiempo)
+            }
+        }
+        return null
     }
 }
