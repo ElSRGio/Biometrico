@@ -4,10 +4,10 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.biometricos.databinding.ItemNotaBinding
-import com.example.biometricos.network.EntrenamientoResponse
+import com.example.biometricos.network.Entrenamiento
 
 class NotasAdapter(
-    private var notas: List<EntrenamientoResponse>,
+    private var notas: List<Entrenamiento>,
     private val onDeleteClick: (String) -> Unit
 ) : RecyclerView.Adapter<NotasAdapter.NotaViewHolder>() {
 
@@ -23,13 +23,13 @@ class NotasAdapter(
         holder.binding.apply {
             tvMetricas.text = "${nota.distanciaKm} km • ${nota.tiempoMinutos} min"
             tvDictado.text = nota.textoOriginal
-            btnDelete.setOnClickListener { onDeleteClick(nota.id) }
+            btnDelete.setOnClickListener { onDeleteClick(nota._id ?: "") }
         }
     }
 
     override fun getItemCount() = notas.size
 
-    fun updateData(newNotas: List<EntrenamientoResponse>) {
+    fun updateData(newNotas: List<Entrenamiento>) {
         notas = newNotas
         notifyDataSetChanged()
     }
