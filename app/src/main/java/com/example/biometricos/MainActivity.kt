@@ -103,7 +103,14 @@ class MainActivity : AppCompatActivity() {
     private fun enviarMetricasAlBackend(distancia: Double, tiempo: Int, texto: String) {
         lifecycleScope.launch {
             try {
-                val request = Entrenamiento(distanciaKm = distancia, tiempoMinutos = tiempo, textoOriginal = texto)
+                // Actualizado para coincidir con el nuevo modelo de Entrenamiento
+                val request = Entrenamiento(
+                    distanceKm = distancia, 
+                    timeMinutes = tiempo, 
+                    originalText = texto,
+                    type = "RUNNING",
+                    tags = listOf("Manos Libres", "Voz")
+                )
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.instance.guardarEntrenamiento(request)
                 }
@@ -141,7 +148,7 @@ class MainActivity : AppCompatActivity() {
     private fun actualizarGrafica(lista: List<Entrenamiento>) {
         val entries = ArrayList<BarEntry>()
         lista.takeLast(7).forEachIndexed { index, ent ->
-            entries.add(BarEntry(index.toFloat(), ent.distanciaKm.toFloat()))
+            entries.add(BarEntry(index.toFloat(), ent.distanceKm.toFloat()))
         }
         configurarGrafica(binding.barChart, entries)
     }
