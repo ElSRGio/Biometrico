@@ -8,10 +8,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
-import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-import androidx.biometric.BiometricPrompt
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.biometricos.adapters.NotasAdapter
@@ -25,14 +21,10 @@ import com.github.mikephil.charting.data.BarEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.Executor
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var executor: Executor
-    private lateinit var biometricPrompt: BiometricPrompt
-    private lateinit var promptInfo: BiometricPrompt.PromptInfo
     private lateinit var notasAdapter: NotasAdapter
 
     private val speechResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -44,7 +36,7 @@ class MainActivity : AppCompatActivity() {
             if (metricas != null) {
                 enviarMetricasAlBackend(metricas.first, metricas.second, spokenText)
             } else {
-                Toast.makeText(this, "No se reconocieron métricas en la voz", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No se reconocieron métricas en: \"$spokenText\"", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -55,14 +47,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupRecyclerView()
-        setupBiometrics()
+        
+        // Inyectamos datos visuales para un look profesional inmediato
+        inyectarDatosVisuales()
 
         binding.btnRecord.setOnClickListener {
             iniciarGrabacion()
         }
 
-        // Iniciar con autenticación
-        biometricPrompt.authenticate(promptInfo)
+        // Cargamos los datos reales desde el backend
+        cargarEntrenamientos()
     }
 
     private fun setupRecyclerView() {
@@ -75,6 +69,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun inyectarDatosVisuales() {
+        val entries = ArrayList<BarEntry>()
+        // Datos simulados estilo Nu para que la gráfica no inicie vacía
+        entries.add(BarEntry(0f, 4.5f)) // Lun
+        entries.add(BarEntry(1f, 6.0f)) // Mar
+        entries.add(BarEntry(2f, 2.0f)) // Mie
+        entries.add(BarEntry(3f, 8.2f)) // Jue
+        entries.add(BarEntry(4f, 5.5f)) // Vie
+        
+        configurarGrafica(binding.barChart, entries)
+    }
+
     private fun cargarEntrenamientos() {
         lifecycleScope.launch {
             try {
@@ -85,9 +91,11 @@ class MainActivity : AppCompatActivity() {
                     val lista = response.body()!!
                     notasAdapter.updateData(lista)
                     actualizarGrafica(lista)
+                } else {
+                    Log.e("API_ERROR", "Error al cargar: ${response.code()}")
                 }
             } catch (e: Exception) {
-                Log.e("API_ERROR", "Error al cargar: ${e.message}")
+                Log.e("API_ERROR", "Error de red al cargar: ${e.message}")
             }
         }
     }
@@ -101,11 +109,16 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (response.isSuccessful) {
-                    Toast.makeText(this@MainActivity, "Entrenamiento guardado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "✅ Entrenamiento guardado", Toast.LENGTH_SHORT).show()
                     cargarEntrenamientos() 
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("API_ERROR", "Error servidor: ${response.code()} - $errorBody")
+                    Toast.makeText(this@MainActivity, "❌ Error servidor: ${response.code()}", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Error de red", Toast.LENGTH_SHORT).show()
+                Log.e("API_ERROR", "Fallo de red", e)
+                Toast.makeText(this@MainActivity, "📡 Error de red: Verifica conexión o URL", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -148,22 +161,6 @@ class MainActivity : AppCompatActivity() {
         barChart.invalidate()
     }
 
-    private fun setupBiometrics() {
-        executor = ContextCompat.getMainExecutor(this)
-        biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                cargarEntrenamientos()
-            }
-        })
-
-        promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Acceso Premium")
-            .setSubtitle("Autenticación biométrica requerida")
-            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
-            .build()
-    }
-
     private fun iniciarGrabacion() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -173,30 +170,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extraerMetricas(textoOriginal: String): Pair<Double, Int>? {
-        // 1. Limpiamos y normalizamos números hablados
+        // 1. Limpiamos y normalizamos números y unidades
         var texto = textoOriginal.lowercase().trim()
-            .replace("un", "1").replace("uno", "1").replace("dos", "2")
-            .replace("tres", "3").replace("cuatro", "4").replace("cinco", "5")
-            .replace("seis", "6").replace("siete", "7").replace("ocho", "8")
-            .replace("nueve", "9").replace("diez", "10")
+            .replace("punto", ".")
+            .replace("coma", ".")
+            .replace(" con ", ".")
+            .replace("un ", "1 ")
+            .replace("uno ", "1 ")
+            .replace("dos", "2").replace("tres", "3").replace("cuatro", "4")
+            .replace("cinco", "5").replace("seis", "6").replace("siete", "7")
+            .replace("ocho", "8").replace("nueve", "9").replace("diez", "10")
             .replace("media hora", "30 minutos").replace("una hora", "60 minutos")
+        
+        // Limpiar espacios entre número y punto (ej: "5 . 5" -> "5.5")
+        texto = texto.replace(Regex("(\\d)\\s*\\.\\s*(\\d)"), "$1.$2")
 
-        // 2. Regex súper flexible (acepta "5km", "5 km", "5k", "5.5 kilómetros")
-        val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros|k)", RegexOption.IGNORE_CASE)
-        // Acepta "20min", "20 min", "20 minutos", "20m"
-        val regexTiempo = Regex("([0-9]+)\\s*(min|minutos|m)", RegexOption.IGNORE_CASE)
+        // 2. Regex ultra-flexible para distancia (km, k, kilómetros, singular/plural)
+        val regexDistancia = Regex("([0-9]+[.,]?[0-9]*)\\s*(km|kilómetros|kilometros|k|kilómetro|kilometro)", RegexOption.IGNORE_CASE)
+        // 3. Regex ultra-flexible para tiempo (min, minutos, m, minuto, hora)
+        val regexTiempo = Regex("([0-9]+)\\s*(min|minutos|m|minuto|hora|horas|hr|hrs)", RegexOption.IGNORE_CASE)
 
         val matchDistancia = regexDistancia.find(texto)
         val matchTiempo = regexTiempo.find(texto)
 
         // Log para depurar qué está escuchando realmente el teléfono
-        android.util.Log.d("VOZ", "Texto original: $textoOriginal | Normalizado: $texto")
+        Log.d("VOZ_DEBUG", "Original: $textoOriginal | Procesado: $texto")
 
         if (matchDistancia != null && matchTiempo != null) {
             val distancia = matchDistancia.groupValues[1].replace(",", ".").toDoubleOrNull()
-            val tiempo = matchTiempo.groupValues[1].toIntOrNull()
+            var tiempo = matchTiempo.groupValues[1].toIntOrNull() ?: 0
+            
+            // Conversión de horas a minutos
+            if (matchTiempo.groupValues[2].contains("hora") || matchTiempo.groupValues[2].contains("hr")) {
+                tiempo *= 60
+            }
 
-            if (distancia != null && tiempo != null) {
+            if (distancia != null && tiempo > 0) {
                 return Pair(distancia, tiempo)
             }
         }
