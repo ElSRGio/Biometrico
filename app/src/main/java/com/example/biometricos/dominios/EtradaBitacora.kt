@@ -1,9 +1,9 @@
 package com.example.biometricos.dominios
 
-import kotlinx.serialization.Serializable
+import com.google.gson.annotations.SerializedName
 
-@Serializable
 data class UserProfile(
+    @SerializedName("_id")
     val id: String,
     val name: String,
     val weightKg: Double,
@@ -11,14 +11,13 @@ data class UserProfile(
     val avatarUrl: String
 )
 
-@Serializable
 data class AiFeedback(
     val emoji: String,
     val shortMessage: String
 )
 
-@Serializable
 data class Entrenamiento(
+    @SerializedName("_id")
     val id: String? = null,
     val type: String = "RUNNING",
     val distanciaKm: Double,

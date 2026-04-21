@@ -32,11 +32,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import com.example.biometricos.dominios.Entrenamiento
 import com.example.biometricos.ui.theme.*
-import com.github.mikephil.charting.charts.BarChart
+import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.BarData
-import com.github.mikephil.charting.data.BarDataSet
-import com.github.mikephil.charting.data.BarEntry
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -169,9 +169,9 @@ fun DashboardContent(
             BentoHeader(state, onNavigateToProfile)
         }
         item {
-            Text("COMPARATIVA DE RENDIMIENTO", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text("PROGRESO HISTÓRICO TOTAL", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            PerformanceChart(state.workouts)
+            FullPerformanceChart(state.workouts)
         }
         item {
             Text("HISTORIAL RECIENTE", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -179,7 +179,7 @@ fun DashboardContent(
         items(state.workouts, key = { it.id ?: it.hashCode() }) { workout ->
             WorkoutItem(
                 workout = workout, 
-                onDelete = { viewModel.eliminarEntrenamiento(workout.id!!) },
+                onDelete = { workout.id?.let { viewModel.eliminarEntrenamiento(it) } },
                 onEdit = { onEditRequest(workout) }
             )
         }
@@ -187,48 +187,67 @@ fun DashboardContent(
 }
 
 @Composable
-fun PerformanceChart(workouts: List<Entrenamiento>) {
-    val lastWorkouts = workouts.take(5).reversed()
+fun FullPerformanceChart(workouts: List<Entrenamiento>) {
+    val allWorkouts = workouts.reversed() 
     Card(
-        modifier = Modifier.fillMaxWidth().height(200.dp),
+        modifier = Modifier.fillMaxWidth().height(250.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(20.dp)
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             factory = { context ->
-                BarChart(context).apply {
+                LineChart(context).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     description.isEnabled = false
                     legend.isEnabled = false
-                    setTouchEnabled(false)
+                    setTouchEnabled(true)
+                    isDragEnabled = true
+                    setScaleEnabled(true)
+                    setPinchZoom(true)
+                    
                     xAxis.apply {
                         position = XAxis.XAxisPosition.BOTTOM
                         textColor = Color.White.toArgb()
                         setDrawGridLines(false)
+                        granularity = 1f
                         valueFormatter = object : ValueFormatter() {
                             override fun getFormattedValue(value: Float): String {
-                                return "E${value.toInt() + 1}"
+                                return "S${value.toInt() + 1}"
                             }
                         }
                     }
-                    axisLeft.textColor = Color.White.toArgb()
+                    axisLeft.apply {
+                        textColor = Color.White.toArgb()
+                        setDrawGridLines(true)
+                        gridColor = Color.Gray.copy(alpha = 0.3f).toArgb()
+                    }
                     axisRight.isEnabled = false
                 }
             },
             update = { chart ->
-                val entries = lastWorkouts.mapIndexed { index, workout ->
-                    BarEntry(index.toFloat(), workout.distanciaKm.toFloat())
+                val entries = allWorkouts.mapIndexed { index, workout ->
+                    Entry(index.toFloat(), workout.distanciaKm.toFloat())
                 }
-                val dataSet = BarDataSet(entries, "Km").apply {
+                
+                val dataSet = LineDataSet(entries, "Kilómetros").apply {
                     color = ElectricBlue.toArgb()
-                    valueTextColor = Color.White.toArgb()
-                    valueTextSize = 10f
+                    setCircleColor(ElectricBlue.toArgb())
+                    lineWidth = 2f
+                    circleRadius = 3f
+                    setDrawCircleHole(false)
+                    valueTextColor = Color.Transparent.toArgb()
+                    mode = LineDataSet.Mode.CUBIC_BEZIER
+                    setDrawFilled(true)
+                    fillColor = ElectricBlue.toArgb()
+                    fillAlpha = 50
                 }
-                chart.data = BarData(dataSet)
+
+                chart.data = LineData(dataSet)
+                chart.animateX(1000)
                 chart.invalidate()
             }
         )
@@ -238,6 +257,13 @@ fun PerformanceChart(workouts: List<Entrenamiento>) {
 @Composable
 fun BentoHeader(state: DashboardUiState.Success, onNavigateToProfile: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(180.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val imcColor = when {
+            state.imc < 18.5 -> Color(0xFF4DD0E1)
+            state.imc < 25.0 -> Color(0xFF66BB6A)
+            state.imc < 30.0 -> Color(0xFFFFA726)
+            else -> Color(0xFFEF5350)
+        }
+
         Card(
             modifier = Modifier.weight(1f).fillMaxHeight(),
             colors = CardDefaults.cardColors(containerColor = CardBackground.copy(alpha = 0.8f)),
@@ -246,8 +272,8 @@ fun BentoHeader(state: DashboardUiState.Success, onNavigateToProfile: () -> Unit
             Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("IMC", color = Color.White, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(12.dp))
-                ImcGauge(state.imc)
-                Text(state.imcCategory, color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                ImcGauge(state.imc, imcColor)
+                Text(state.imcCategory, color = imcColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
         Card(
@@ -267,7 +293,7 @@ fun BentoHeader(state: DashboardUiState.Success, onNavigateToProfile: () -> Unit
 }
 
 @Composable
-fun ImcGauge(imc: Double) {
+fun ImcGauge(imc: Double, color: Color) {
     val animatedProgress = remember { Animatable(0f) }
     LaunchedEffect(imc) {
         animatedProgress.animateTo(
@@ -286,7 +312,7 @@ fun ImcGauge(imc: Double) {
                 style = Stroke(8.dp.toPx(), cap = StrokeCap.Round)
             )
             drawArc(
-                brush = Brush.horizontalGradient(listOf(ElectricBlue, NeonGreen)),
+                color = color,
                 startAngle = 135f,
                 sweepAngle = 270f * animatedProgress.value,
                 useCenter = false,
