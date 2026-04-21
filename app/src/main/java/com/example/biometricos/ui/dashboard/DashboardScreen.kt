@@ -29,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import com.example.biometricos.dominios.Entrenamiento
 import com.example.biometricos.ui.theme.*
 import com.github.mikephil.charting.charts.LineChart
@@ -92,8 +91,11 @@ fun DashboardScreen(
                     )
                 }
                 is DashboardUiState.Error -> {
-                    Text("Error: ${state.message}", color = Color.Red)
-                    Button(onClick = { viewModel.loadData() }) { Text("Reintentar") }
+                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Text("Error: ${state.message}", color = Color.Red)
+                        Spacer(Modifier.height(16.dp))
+                        Button(onClick = { viewModel.loadData() }) { Text("Reintentar") }
+                    }
                 }
             }
         }
@@ -103,7 +105,7 @@ fun DashboardScreen(
                 workout = workout,
                 onDismiss = { editingWorkout = null },
                 onConfirm = { dist, time ->
-                    viewModel.actualizarEntrenamiento(workout.id!!, dist, time)
+                    workout.id?.let { viewModel.actualizarEntrenamiento(it, dist, time) }
                     editingWorkout = null
                 }
             )
@@ -176,7 +178,8 @@ fun DashboardContent(
         item {
             Text("HISTORIAL RECIENTE", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
-        items(state.workouts, key = { it.id ?: it.hashCode() }) { workout ->
+        // Usamos una clave más segura para evitar el crash al deslizar/borrar
+        items(state.workouts, key = { it.id ?: System.currentTimeMillis() + it.hashCode() }) { workout ->
             WorkoutItem(
                 workout = workout, 
                 onDelete = { workout.id?.let { viewModel.eliminarEntrenamiento(it) } },
@@ -233,21 +236,22 @@ fun FullPerformanceChart(workouts: List<Entrenamiento>) {
                     Entry(index.toFloat(), workout.distanciaKm.toFloat())
                 }
                 
-                val dataSet = LineDataSet(entries, "Kilómetros").apply {
-                    color = ElectricBlue.toArgb()
-                    setCircleColor(ElectricBlue.toArgb())
-                    lineWidth = 2f
-                    circleRadius = 3f
-                    setDrawCircleHole(false)
-                    valueTextColor = Color.Transparent.toArgb()
-                    mode = LineDataSet.Mode.CUBIC_BEZIER
-                    setDrawFilled(true)
-                    fillColor = ElectricBlue.toArgb()
-                    fillAlpha = 50
+                if (entries.isNotEmpty()) {
+                    val dataSet = LineDataSet(entries, "Kilómetros").apply {
+                        color = ElectricBlue.toArgb()
+                        setCircleColor(ElectricBlue.toArgb())
+                        lineWidth = 2f
+                        circleRadius = 3f
+                        setDrawCircleHole(false)
+                        valueTextColor = Color.Transparent.toArgb()
+                        mode = LineDataSet.Mode.CUBIC_BEZIER
+                        setDrawFilled(true)
+                        fillColor = ElectricBlue.toArgb()
+                        fillAlpha = 50
+                    }
+                    chart.data = LineData(dataSet)
+                    chart.animateX(500)
                 }
-
-                chart.data = LineData(dataSet)
-                chart.animateX(1000)
                 chart.invalidate()
             }
         )
