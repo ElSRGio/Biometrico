@@ -2,6 +2,7 @@ package com.example.biometricos.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.biometricos.dominios.Entrenamiento
 import com.example.biometricos.network.RetrofitClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,7 +56,29 @@ class DashboardViewModel : ViewModel() {
                     loadData()
                 }
             } catch (e: Exception) {
-                // Manejar error silenciosamente o via UI
+                _uiState.value = DashboardUiState.Error("No se pudo eliminar: ${e.message}")
+            }
+        }
+    }
+
+    fun actualizarEntrenamiento(id: String, distancia: Double, tiempo: Int) {
+        viewModelScope.launch {
+            try {
+                // Buscamos el entrenamiento actual para mantener los otros campos
+                val currentWorkouts = (uiState.value as? DashboardUiState.Success)?.workouts
+                val current = currentWorkouts?.find { it.id == id }
+                
+                if (current != null) {
+                    val updated = current.copy(distanciaKm = distancia, tiempoMinutos = tiempo)
+                    val res = RetrofitClient.instance.actualizarEntrenamiento(API_KEY, id, updated)
+                    if (res.isSuccessful) {
+                        loadData()
+                    } else {
+                        _uiState.value = DashboardUiState.Error("Error al actualizar en el servidor")
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = DashboardUiState.Error("Error de red al actualizar")
             }
         }
     }

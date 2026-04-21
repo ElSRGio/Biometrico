@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsRun
@@ -24,9 +25,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import com.example.biometricos.dominios.Entrenamiento
 import com.example.biometricos.ui.theme.*
 import com.github.mikephil.charting.charts.BarChart
@@ -44,6 +47,7 @@ fun DashboardScreen(
     onNavigateToProfile: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var editingWorkout by remember { mutableStateOf<Entrenamiento?>(null) }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -80,7 +84,12 @@ fun DashboardScreen(
                     }
                 }
                 is DashboardUiState.Success -> {
-                    DashboardContent(state, viewModel, onNavigateToProfile)
+                    DashboardContent(
+                        state = state, 
+                        viewModel = viewModel, 
+                        onNavigateToProfile = onNavigateToProfile,
+                        onEditRequest = { editingWorkout = it }
+                    )
                 }
                 is DashboardUiState.Error -> {
                     Text("Error: ${state.message}", color = Color.Red)
@@ -88,11 +97,73 @@ fun DashboardScreen(
                 }
             }
         }
+
+        editingWorkout?.let { workout ->
+            EditWorkoutDialog(
+                workout = workout,
+                onDismiss = { editingWorkout = null },
+                onConfirm = { dist, time ->
+                    viewModel.actualizarEntrenamiento(workout.id!!, dist, time)
+                    editingWorkout = null
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun DashboardContent(state: DashboardUiState.Success, viewModel: DashboardViewModel, onNavigateToProfile: () -> Unit) {
+fun EditWorkoutDialog(
+    workout: Entrenamiento,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Int) -> Unit
+) {
+    var dist by remember { mutableStateOf(workout.distanciaKm.toString()) }
+    var time by remember { mutableStateOf(workout.tiempoMinutos.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardBackground,
+        title = { Text("EDITAR ENTRENAMIENTO", color = ElectricBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = dist,
+                    onValueChange = { dist = it },
+                    label = { Text("Distancia (km)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedTextColor = Color.White, focusedTextColor = Color.White)
+                )
+                OutlinedTextField(
+                    value = time,
+                    onValueChange = { time = it },
+                    label = { Text("Tiempo (min)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedTextColor = Color.White, focusedTextColor = Color.White)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { 
+                onConfirm(dist.toDoubleOrNull() ?: 0.0, time.toIntOrNull() ?: 0)
+            }) {
+                Text("GUARDAR", color = ElectricBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCELAR", color = Color.Gray)
+            }
+        }
+    )
+}
+
+@Composable
+fun DashboardContent(
+    state: DashboardUiState.Success, 
+    viewModel: DashboardViewModel, 
+    onNavigateToProfile: () -> Unit,
+    onEditRequest: (Entrenamiento) -> Unit
+) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             BentoHeader(state, onNavigateToProfile)
@@ -107,9 +178,9 @@ fun DashboardContent(state: DashboardUiState.Success, viewModel: DashboardViewMo
         }
         items(state.workouts, key = { it.id ?: it.hashCode() }) { workout ->
             WorkoutItem(
-                workout = workout,
+                workout = workout, 
                 onDelete = { viewModel.eliminarEntrenamiento(workout.id!!) },
-                onEdit = { /* Implementar edición */ }
+                onEdit = { onEditRequest(workout) }
             )
         }
     }
@@ -238,7 +309,7 @@ fun WorkoutItem(workout: Entrenamiento, onDelete: () -> Unit, onEdit: () -> Unit
                 }
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onEdit()
-                    false // Don't dismiss for edit
+                    false
                 }
                 else -> false
             }
