@@ -38,7 +38,7 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun saveProfile(name: String, weight: Double, height: Int) {
+    fun saveProfile(name: String, weight: Double, height: Int, avatarUrl: String) {
         viewModelScope.launch {
             _uiState.value = ProfileUiState.Loading
             try {
@@ -48,7 +48,7 @@ class ProfileViewModel : ViewModel() {
                     name = name,
                     weightKg = weight,
                     heightCm = height,
-                    avatarUrl = current?.avatarUrl ?: ""
+                    avatarUrl = avatarUrl
                 )
                 val res = RetrofitClient.instance.updateProfile(API_KEY, updated)
                 if (res.isSuccessful) {

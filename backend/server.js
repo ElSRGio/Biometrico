@@ -17,23 +17,40 @@ const verificarApiKey = (req, res, next) => {
 const Entrenamiento = require('./models/Entrenamiento');
 const Usuario = require('./models/Usuario');
 
-// RF06: Obtener Perfil para Dashboard e IMC
+// Obtener Perfil
 app.get('/api/users/profile', verificarApiKey, async (req, res) => {
     let perfil = await Usuario.findOne();
-    if (!perfil) perfil = await Usuario.create({});
+    if (!perfil) perfil = await Usuario.create({ name: "Atleta", weightKg: 70, heightCm: 170 });
     res.json(perfil);
 });
 
-// RF04: Guardar con Feedback Dinámico
+// Actualizar Perfil
+app.post('/api/users/profile', verificarApiKey, async (req, res) => {
+    try {
+        const { name, weightKg, heightCm, avatarUrl } = req.body;
+        let perfil = await Usuario.findOne();
+        if (perfil) {
+            perfil.name = name;
+            perfil.weightKg = weightKg;
+            perfil.heightCm = heightCm;
+            perfil.avatarUrl = avatarUrl;
+            await perfil.save();
+        } else {
+            perfil = await Usuario.create({ name, weightKg, heightCm, avatarUrl });
+        }
+        res.json(perfil);
+    } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
+// Guardar Entrenamiento
 app.post('/api/entrenamientos', verificarApiKey, async (req, res) => {
     try {
-        const { distanciaKm, tiempoMinutos, textoOriginal } = req.body;
-        const tags = distanciaKm > 8 ? ["Récord", "Cardio"] : ["Cardio"];
-
+        const { distanciaKm, tiempoMinutos, originalText, type, tags } = req.body;
         const nuevo = new Entrenamiento({
             distanciaKm,
             tiempoMinutos,
-            textoOriginal,
+            originalText,
+            type,
             tags,
             aiFeedback: {
                 emoji: distanciaKm > 5 ? "⚡" : "🔋",
@@ -45,9 +62,31 @@ app.post('/api/entrenamientos', verificarApiKey, async (req, res) => {
     } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+// Actualizar Entrenamiento
+app.put('/api/entrenamientos/:id', verificarApiKey, async (req, res) => {
+    try {
+        const { distanciaKm, tiempoMinutos } = req.body;
+        const actualizado = await Entrenamiento.findByIdAndUpdate(
+            req.params.id,
+            { distanciaKm, tiempoMinutos },
+            { new: true }
+        );
+        res.json(actualizado);
+    } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
+// Obtener Entrenamientos
 app.get('/api/entrenamientos', verificarApiKey, async (req, res) => {
     const data = await Entrenamiento.find().sort({ fecha: -1 });
     res.json(data);
+});
+
+// Eliminar Entrenamiento
+app.delete('/api/entrenamientos/:id', verificarApiKey, async (req, res) => {
+    try {
+        await Entrenamiento.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Eliminado' });
+    } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 const PORT = process.env.PORT || 3000;
