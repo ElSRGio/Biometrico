@@ -27,7 +27,20 @@ class FocusViewModel : ViewModel() {
         _uiState.value = if (isRecording) FocusUiState.Recording else FocusUiState.Idle
     }
 
-    fun enviarMetricas(distancia: Double, tiempo: Int, texto: String) {
+    fun procesarDictado(texto: String) {
+        // Buscamos todos los números en el texto (pueden ser decimales)
+        val numeros = "\\d+(\\.\\d+)?".toRegex().findAll(texto)
+            .map { it.value.toDouble() }
+            .toList()
+
+        // El primer número será la distancia, el segundo el tiempo
+        val distancia = numeros.getOrNull(0) ?: 0.0
+        val tiempo = numeros.getOrNull(1)?.toInt() ?: 0
+
+        enviarMetricas(distancia, tiempo, texto)
+    }
+
+    private fun enviarMetricas(distancia: Double, tiempo: Int, texto: String) {
         viewModelScope.launch {
             _uiState.value = FocusUiState.Processing
             try {
@@ -42,7 +55,7 @@ class FocusViewModel : ViewModel() {
                 if (response.isSuccessful && response.body()?.aiFeedback != null) {
                     _uiState.value = FocusUiState.Success(response.body()!!.aiFeedback!!)
                 } else {
-                    _uiState.value = FocusUiState.Error("Error al procesar entrenamiento")
+                    _uiState.value = FocusUiState.Error("Error al procesar entrenamiento: ${response.code()}")
                 }
             } catch (e: Exception) {
                 _uiState.value = FocusUiState.Error(e.message ?: "Error de red")

@@ -41,8 +41,8 @@ fun FocusModeScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             val spokenText = matches?.get(0) ?: ""
-            // Enviamos métricas aleatorias para el examen, con el texto reconocido
-            viewModel.enviarMetricas(6.2, 45, spokenText)
+            // Ahora llamamos a procesarDictado para extraer los números reales
+            viewModel.procesarDictado(spokenText)
         } else {
             viewModel.reset()
         }
