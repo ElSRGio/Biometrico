@@ -41,8 +41,8 @@ fun FocusModeScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             val spokenText = matches?.get(0) ?: ""
-            // Simple logic de extracción para el demo
-            viewModel.enviarMetricas(5.5, 30, spokenText)
+            // Enviamos métricas aleatorias para el examen, con el texto reconocido
+            viewModel.enviarMetricas(6.2, 45, spokenText)
         } else {
             viewModel.reset()
         }
@@ -86,16 +86,26 @@ fun FocusModeScreen(
                     )
                 }
                 is FocusUiState.Processing -> {
-                    CircularProgressIndicator(color = ElectricBlue)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = ElectricBlue)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("PROCESANDO CON IA...", color = Color.White, fontSize = 12.sp)
+                    }
                 }
                 is FocusUiState.Success -> {
                     FeedbackDisplay(state.feedback.emoji, state.feedback.shortMessage) {
                         viewModel.reset()
+                        onBack() // Al darle a NUEVA NOTA, regresamos para ver el dashboard actualizado
                     }
                 }
                 is FocusUiState.Error -> {
-                    Text(state.message, color = NeonPink)
-                    Button(onClick = { viewModel.reset() }) { Text("Reintentar") }
+                    Text(state.message, color = NeonPink, modifier = Modifier.padding(16.dp))
+                    Button(
+                        onClick = { viewModel.reset() },
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+                    ) {
+                        Text("REINTENTAR", color = Color.Black)
+                    }
                 }
             }
         }
@@ -155,9 +165,10 @@ fun FeedbackDisplay(emoji: String, message: String, onReset: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = onReset,
-            colors = ButtonDefaults.buttonColors(containerColor = CardBackground)
+            colors = ButtonDefaults.buttonColors(containerColor = CardBackground),
+            modifier = Modifier.height(50.dp).fillMaxWidth(0.6f)
         ) {
-            Text("NUEVA NOTA", color = ElectricBlue)
+            Text("NUEVA NOTA", color = ElectricBlue, fontWeight = FontWeight.Bold)
         }
     }
 }

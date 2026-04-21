@@ -4,7 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.biometricos.databinding.ItemNotaBinding
-import com.example.biometricos.network.Entrenamiento
+import com.example.biometricos.dominios.Entrenamiento
 
 class NotasAdapter(
     private var notas: List<Entrenamiento>,
@@ -22,8 +22,8 @@ class NotasAdapter(
         val nota = notas[position]
         holder.binding.apply {
             tvMetricas.text = "${nota.distanciaKm} km • ${nota.tiempoMinutos} min"
-            tvDictado.text = nota.textoOriginal
-            btnDelete.setOnClickListener { onDeleteClick(nota._id ?: "") }
+            tvDictado.text = nota.originalText
+            btnDelete.setOnClickListener { onDeleteClick(nota.id ?: "") }
         }
     }
 
